@@ -1,0 +1,266 @@
+// Convenience function to clamp a value between a given minimum and maximum
+long clamp(long val, long min, long max) {
+	if (val < min)
+		return min;
+
+	if (val > max)
+		return max;
+
+	return val;
+}
+
+// Position control function. Takes in the motor to be controller,
+// current voltage, and a target position
+void posCont(byte motor, long tgt, long voltage) {
+	// Control gain
+	const long kp = 100000; // Percent millivolts per degree
+
+	// Maximum output absolute value
+	const long maxOut = 100;
+
+	// Maximum absolute error value before the control saturates.
+	long satErr = maxOut * voltage / kp;
+
+	// Compute the positioning error. The sign of this error matches
+	// the sign of the control input necessary to decrease the error.
+	long error = tgt - MotorRotationCount(motor);
+
+	// Check for error saturation, and set the maximum possible command if it's saturated.
+	// Otherwise, compute the command via proportional control.
+	// Checking the error prevents a possible long overflow.
+	long tau;
+	if (error > satErr)
+		tau = maxOut;
+	else if (error < -satErr)
+		tau = -maxOut;
+	else
+		tau = clamp(kp * error / voltage, -maxOut, maxOut);
+
+	// Write out the new command
+	OnFwd(motor, tau);
+}
+
+// Polls for new updates from the host PC,
+// and processes any that have been received.
+void hostComms() {
+	// TODO: This
+}
+
+// This flag gets set to true when the front button is placed. It triggers a program abort
+// after relaxing the trigger mechanism.
+bool btnAbort = false;
+
+// States for the trigger system
+enum {TRIG_IDLE, TRIG_PULLACCEL, TRIG_SPINNING, TRIG_PULLTRIG, TRIG_FIRING};
+
+// Trigger control system shared variables
+unsigned byte trigState;          // Current trigger system state. Initialized in main()
+long          sTransTime;         // Time of the last state transition, if necessary
+long          firingTime = 0;     // Total amount of time the gun has spent firing (doesn't include current pull, if firing now). Used to check for the out-of-ammo condition.
+bool          shouldFire = false; // The command to the trigger system -- should we fire or not?
+bool          hasAmmo    = true;  // Whether or not there's ammunition. Based on tracking firing duration.
+
+// Compute and command the acceleration holding torque
+void trigHoldAccel(long voltage) {
+	const long accelPullTrq = 100000; // Torque for holding the acceleration trigger, in percent millivolts
+	OnRev(OUT_A, clamp(accelPullTrq / voltage, 0, 100));
+}
+
+// Same as trigHoldAccel but for the trigger
+void trigHoldTrig(long voltage) {
+	const long trigPullTrq = 50000;
+	OnRev(OUT_C, clamp(trigPullTrq / voltage, 0, 100));
+}
+
+// Function to execute a state transition
+void trigStateTrans(unsigned byte newState, long time) {
+	trigState  = newState;
+	sTransTime = time;
+}
+
+// Periodic trigger control function. Called
+// repeatedly by the main loop. Must be given
+// the battery level (in millivolts)
+void runTrigger(long voltage) {
+	// Trigger control parameters
+	const long accelPullTime =  500; // Pull time for the acceleration trigger, ms
+	const long spinWaitTime  =    0; // Wait time between acceleration pull and trigger pull, ms
+	const long trigPullTime  =  400; // Pull time for the trigger, ms
+	const long magCapTime    = 5000; // Magazine capacity, in milliseconds of firing time.
+	const long abortTime     =  400; // Duration of an aborted fire, ms
+
+	// Grab the current time; this is used frequently
+	long time = CurrentTick();
+
+	// State machine for the trigger code
+	switch (trigState) {
+		case TRIG_IDLE:
+			// Check if the front orange button was used to stop operation.
+			// We should be in a safe state now, so abort if commanded.
+			if (btnAbort && time >= sTransTime + abortTime) {
+				Off(OUT_ABC);
+				abort();
+			}
+
+			if (shouldFire) {
+				OnRev(OUT_A, 100);
+				Off(OUT_C);
+				trigStateTrans(TRIG_PULLACCEL, time);
+				break;
+			}
+
+			// Position the motors to the zero position (a "calibration point")
+			posCont(OUT_A, 0, voltage);
+			posCont(OUT_C, 0, voltage);
+
+			break;
+
+		case TRIG_PULLACCEL:
+			if (!shouldFire) {
+				OnFwd(OUT_A, 100);
+				trigStateTrans(TRIG_IDLE, time);
+			} else if (CurrentTick() > sTransTime + accelPullTime) {
+				trigHoldAccel(voltage);
+				trigStateTrans(TRIG_SPINNING, time);
+			}
+
+			break;
+
+		case TRIG_SPINNING:
+			if (!shouldFire) {
+				OnFwd(OUT_A, 100);
+				trigStateTrans(TRIG_IDLE, time);
+				break;
+			}
+
+			trigHoldAccel(voltage);
+
+			if (time >= sTransTime + spinWaitTime) {
+				OnRev(OUT_C, 100);
+				trigStateTrans(TRIG_PULLTRIG, time);
+			}
+
+			break;
+
+		case TRIG_PULLTRIG:
+			if (!shouldFire) {
+				OnFwd(OUT_AC, 100);
+				trigStateTrans(TRIG_IDLE, time);
+				break;
+			}
+
+			trigHoldAccel(voltage);
+
+			if (time >= sTransTime + trigPullTime) {
+				trigHoldTrig(voltage);
+				trigStateTrans(TRIG_FIRING, time);
+			}
+
+			break;
+
+		case TRIG_FIRING:
+			// Check if the magazine is empty
+			long totFireTime = firingTime + time - sTransTime;
+			if (totFireTime >= magCapTime) {
+				hasAmmo    = false;
+				shouldFire = false;
+			}
+
+			// Relax if we're done firing
+			if (!shouldFire) {
+				OnFwd(OUT_AC, 100);
+				trigStateTrans(TRIG_IDLE, time);
+				firingTime = totFireTime;
+				break;
+			}
+
+			trigHoldAccel(voltage);
+			trigHoldTrig(voltage);
+
+			break;
+	}
+}
+
+// Aiming system shared variables
+long aimTgt     = 0;     // Target aiming position, in degrees of motor rotation. Gear ratio: 56/16 == 3.5
+bool aimEnabled = false; // Whether or not the aiming controller is enabled.
+
+// Function to enable aiming control
+void enableAim() {
+	aimEnabled = true;
+}
+
+// Function to disable aiming control
+void disableAim() {
+	aimEnabled = false;
+	Coast(OUT_B); // runAim() will no longer send signals to the motor, so we need to shut it off ourselves.
+}
+
+// Periodic aiming function. Should be called repeatedly by the main loop.
+// Must be given the battery level (in millivolts)
+void runAim(long voltage) {
+	// If the aiming controller is disabled, quit immediately.
+	if (!aimEnabled)
+		return;
+
+	// Aiming is just position control. Redirect to the position controller
+	posCont(OUT_B, aimTgt, voltage);
+}
+
+task main() {
+	// Initialize the triggering state machine
+	trigState = TRIG_IDLE;
+
+	// Debugging
+	enableAim();
+	shouldFire = true;
+	aimTgt = -200;
+	long sTime = CurrentTick();
+
+	// Main control loop. This checks for new command messages
+	// at each iteration, then executes the relevant controllers.
+	while (true) {
+		// Poll for and process commands from the host PC
+		hostComms();
+
+		// Fake inputs for debugging purposes
+		//if (CurrentTick() > 1000 + sTime) {
+		//	aimTgt = 150;
+
+		//	if (CurrentTick() > 2000 + sTime) {
+		//		aimTgt = -150;
+		//	}
+
+		//	if (CurrentTick() > 3000 + sTime) {
+		//		aimTgt = 0;
+		//	}
+		//}
+		if (!hasAmmo) {
+			aimTgt = 0;
+		}
+
+		// Check for a button-triggered abort
+		if (ButtonPressed(BTNCENTER, false)) {
+			btnAbort   = true;
+			shouldFire = false;
+		}
+
+		// Grab the battery voltage, which is used by the control algorithms
+		// to scale commands. This is a long because the functions which use it
+		// used signed long arithmetic to avoid overflows
+		long voltage = BatteryLevel(); // Unit: Millivolts
+
+		// Execute the trigger and aiming subsystems
+		runTrigger(voltage);
+		runAim(voltage);
+
+		// Safeties! Don't want to pull the NXT off the table (or damage the cables)...
+		long posB = MotorRotationCount(OUT_B);
+		if (posB > 250 || posB < -250) {
+			Off(OUT_ABC);
+			break;
+		}
+	}
+}
+
+// vim: syntax=c

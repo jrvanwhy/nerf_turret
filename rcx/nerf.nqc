@@ -1,0 +1,82 @@
+// Tuning values
+#define LIGHT_THRESH  63
+#define ACCHOLD_PWR    0
+#define TRIGHOLD_PWR   0
+#define ACCPULL_TIME  20
+#define TRIGPULL_TIME 20
+
+// Indexes
+#define LIGHT_IN    SENSOR_1
+#define ACC_MOTOR   OUT_A
+#define TRIG_MOTOR  OUT_C
+#define STATE_TIMER 0
+
+// State machine states enumeration
+#define STATE_IDLE     0
+#define STATE_ACCPULL  1
+#define STATE_TRIGPULL 2
+#define STATE_FIRING   3
+
+task main()
+{
+	// Initialization
+	SetSensor(LIGHT_IN, SENSOR_LIGHT);
+	int state = STATE_IDLE;
+
+	while (true) {
+		int isLightOn = (LIGHT_IN > LIGHT_THRESH);
+
+		switch (state) {
+			case STATE_IDLE:
+				if (isLightOn) {
+					SetPower(ACC_MOTOR, OUT_FULL);
+					On(ACC_MOTOR);
+					state = STATE_ACCPULL;
+					ClearTimer(STATE_TIMER);
+				}
+
+				break;
+
+			case STATE_ACCPULL:
+				if (!isLightOn) {
+					Float(ACC_MOTOR);
+					state = STATE_IDLE;
+					break;
+				}
+
+				if (FastTimer(STATE_TIMER) >= ACCPULL_TIME) {
+					SetPower(ACC_MOTOR, ACCHOLD_PWR);
+					SetPower(TRIG_MOTOR, OUT_FULL);
+					On(TRIG_MOTOR);
+					state = STATE_TRIGPULL;
+					ClearTimer(STATE_TIMER);
+				}
+
+				break;
+
+			case STATE_TRIGPULL:
+				if (!isLightOn) {
+					Float(ACC_MOTOR + TRIG_MOTOR);
+					state = STATE_IDLE;
+					break;
+				}
+
+				if (FastTimer(STATE_TIMER) >= TRIGPULL_TIME) {
+					SetPower(TRIG_MOTOR, TRIGHOLD_PWR);
+					state = STATE_FIRING;
+				}
+
+				break;
+
+			case STATE_FIRING:
+				if (!isLightOn) {
+					Float(ACC_MOTOR + TRIG_MOTOR);
+					state = STATE_IDLE;
+				}
+
+				break;
+		}
+	}
+}
+
+// vim: ts=4

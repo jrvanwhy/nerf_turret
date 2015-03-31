@@ -46,36 +46,50 @@ void hostComms() {
 	// TODO: This
 }
 
-// This flag gets set to true when the front button is placed. It triggers a program abort
-// after relaxing the trigger mechanism.
-bool btnAbort = false;
-
-// States for the trigger system
-enum {TRIG_IDLE, TRIG_PULLACCEL, TRIG_SPINNING, TRIG_PULLTRIG, TRIG_FIRING};
-
 // Trigger control system shared variables
-unsigned byte trigState;          // Current trigger system state. Initialized in main()
-long          sTransTime;         // Time of the last state transition, if necessary
-long          firingTime = 0;     // Total amount of time the gun has spent firing (doesn't include current pull, if firing now). Used to check for the out-of-ammo condition.
-bool          shouldFire = false; // The command to the trigger system -- should we fire or not?
-bool          hasAmmo    = true;  // Whether or not there's ammunition. Based on tracking firing duration.
+bool isFiring   = false;  // Whether or not we're currently firing
+long firingTime = 0;      // Total amount of time the gun has spent firing (doesn't include current pull, if firing now). Used to check for the out-of-ammo condition.
+bool hasAmmo    = true;   // Whether or not there's ammunition. Based on tracking firing duration.
+long fireSTime;           // The time at which we started firing -- this should already include the trigPullTime correction
+const byte trigPort = S4; // The port the triggering light is on
 
-// Compute and command the acceleration holding torque
-void trigHoldAccel(long voltage) {
-	const long accelPullTrq = 100000; // Torque for holding the acceleration trigger, in percent millivolts
-	OnRev(OUT_A, clamp(accelPullTrq / voltage, 0, 100));
+// Function to begin firing. Safe to call if currently firing or out of ammo -- is a noop in those cases)
+void startFire() {
+	// Tuning parameters
+	const long trigPullTime = 500; // Time required to start firing, in milliseconds of firing time
+
+	// Don't do anything if there's no ammo or we're already firing
+	if (!hasAmmo || isFiring)
+		return;
+
+	// "Begin" firing
+	SetSensorLight(trigPort, true);
+	isFiring = true;
+
+	// Record the "start time" of the firing
+	fireSTime = CurrentTick() + trigPullTime;
 }
 
-// Same as trigHoldAccel but for the trigger
-void trigHoldTrig(long voltage) {
-	const long trigPullTrq = 50000;
-	OnRev(OUT_C, clamp(trigPullTrq / voltage, 0, 100));
-}
+// Function to end firing. Safe to call even if not firing (noop if not currently firing)
+void endFire() {
+	// Don't do anything if we're not already firing
+	if (!isFiring)
+		return;
 
-// Function to execute a state transition
-void trigStateTrans(unsigned byte newState, long time) {
-	trigState  = newState;
-	sTransTime = time;
+	// Stop firing
+	SetSensorLight(trigPort, false);
+	isFiring = false;
+
+	// Compute how long we just fired for
+	long addFireTime = CurrentTick() - fireSTime;
+
+	// Don't add the fire time if it was too short (i.e.
+	// if it wasn't long enough to actually pull the trigger)
+	if (addFireTime <= 0)
+		return;
+
+	// Add to the total firing time
+	firingTime = firingTime + addFireTime;
 }
 
 // Periodic trigger control function. Called
@@ -83,102 +97,22 @@ void trigStateTrans(unsigned byte newState, long time) {
 // the battery level (in millivolts)
 void runTrigger(long voltage) {
 	// Trigger control parameters
-	const long accelPullTime =  500; // Pull time for the acceleration trigger, ms
-	const long spinWaitTime  =    0; // Wait time between acceleration pull and trigger pull, ms
-	const long trigPullTime  =  400; // Pull time for the trigger, ms
-	const long magCapTime    = 5000; // Magazine capacity, in milliseconds of firing time.
-	const long abortTime     =  400; // Duration of an aborted fire, ms
+	const long magCapTime = 5000; // Magazine capacity, in milliseconds of firing time.
 
-	// Grab the current time; this is used frequently
-	long time = CurrentTick();
+	// If we're not firing, we don't need to do anything. Return early.
+	if (!isFiring)
+		return;
 
-	// State machine for the trigger code
-	switch (trigState) {
-		case TRIG_IDLE:
-			// Check if the front orange button was used to stop operation.
-			// We should be in a safe state now, so abort if commanded.
-			if (btnAbort && time >= sTransTime + abortTime) {
-				Off(OUT_ABC);
-				abort();
-			}
+	// Compute the total amount of firing time.
+	long totFiringTime = firingTime + CurrentTick() - fireSTime;
 
-			if (shouldFire) {
-				OnRev(OUT_A, 100);
-				Off(OUT_C);
-				trigStateTrans(TRIG_PULLACCEL, time);
-				break;
-			}
+	// Don't do anything if we still have ammo.
+	if (totFiringTime < magCapTime)
+		return;
 
-			// Position the motors to the zero position (a "calibration point")
-			posCont(OUT_A, 0, voltage);
-			posCont(OUT_C, 0, voltage);
-
-			break;
-
-		case TRIG_PULLACCEL:
-			if (!shouldFire) {
-				OnFwd(OUT_A, 100);
-				trigStateTrans(TRIG_IDLE, time);
-			} else if (CurrentTick() > sTransTime + accelPullTime) {
-				trigHoldAccel(voltage);
-				trigStateTrans(TRIG_SPINNING, time);
-			}
-
-			break;
-
-		case TRIG_SPINNING:
-			if (!shouldFire) {
-				OnFwd(OUT_A, 100);
-				trigStateTrans(TRIG_IDLE, time);
-				break;
-			}
-
-			trigHoldAccel(voltage);
-
-			if (time >= sTransTime + spinWaitTime) {
-				OnRev(OUT_C, 100);
-				trigStateTrans(TRIG_PULLTRIG, time);
-			}
-
-			break;
-
-		case TRIG_PULLTRIG:
-			if (!shouldFire) {
-				OnFwd(OUT_AC, 100);
-				trigStateTrans(TRIG_IDLE, time);
-				break;
-			}
-
-			trigHoldAccel(voltage);
-
-			if (time >= sTransTime + trigPullTime) {
-				trigHoldTrig(voltage);
-				trigStateTrans(TRIG_FIRING, time);
-			}
-
-			break;
-
-		case TRIG_FIRING:
-			// Check if the magazine is empty
-			long totFireTime = firingTime + time - sTransTime;
-			if (totFireTime >= magCapTime) {
-				hasAmmo    = false;
-				shouldFire = false;
-			}
-
-			// Relax if we're done firing
-			if (!shouldFire) {
-				OnFwd(OUT_AC, 100);
-				trigStateTrans(TRIG_IDLE, time);
-				firingTime = totFireTime;
-				break;
-			}
-
-			trigHoldAccel(voltage);
-			trigHoldTrig(voltage);
-
-			break;
-	}
+	// Stop firing and record that we're out of ammo
+	SetSensorLight(trigPort, false);
+	hasAmmo = false;
 }
 
 // Aiming system shared variables
@@ -208,41 +142,41 @@ void runAim(long voltage) {
 }
 
 task main() {
-	// Initialize the triggering state machine
-	trigState = TRIG_IDLE;
-
 	// Debugging
 	enableAim();
-	shouldFire = true;
 	aimTgt = -200;
 	long sTime = CurrentTick();
 
+	startFire();
+
 	// Main control loop. This checks for new command messages
 	// at each iteration, then executes the relevant controllers.
+	int iter = 0;
 	while (true) {
 		// Poll for and process commands from the host PC
 		hostComms();
 
 		// Fake inputs for debugging purposes
-		//if (CurrentTick() > 1000 + sTime) {
-		//	aimTgt = 150;
+		switch (++iter) {
+			case 1000:
+				endFire();
+				break;
 
-		//	if (CurrentTick() > 2000 + sTime) {
-		//		aimTgt = -150;
-		//	}
+			case 2000:
+				startFire();
+				break;
 
-		//	if (CurrentTick() > 3000 + sTime) {
-		//		aimTgt = 0;
-		//	}
-		//}
-		if (!hasAmmo) {
-			aimTgt = 0;
-		}
+			case 4000:
+				endFire();
+				break;
 
-		// Check for a button-triggered abort
-		if (ButtonPressed(BTNCENTER, false)) {
-			btnAbort   = true;
-			shouldFire = false;
+			case 5000:
+				startFire();
+				break;
+
+			case 8000:
+				endFire();
+				break;
 		}
 
 		// Grab the battery voltage, which is used by the control algorithms

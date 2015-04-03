@@ -7,9 +7,18 @@
 
 \linespread{1.5}
 
+\setcounter{secnumdepth}{0}
+
 \begin{document}
 	\maketitle
 
 	This document describes the various commands supported by this project's NXT firmware.
 	It server as documentation of the interface between the NXT and the control computer used to control the Nerf turret.
+
+	\section{Miscellaneous}
+	\textbf{Mailbox:} All commands from the control computer to the NXT should be sent to the first mailbox (0 or 1, depending on if you're using 0 or 1-based indexing).
+
+	\noindent
+	\textbf{Program Name:} The program name (for remotely starting the program) is: \texttt{nerf.rxe}
+
 \end{document}

@@ -1,0 +1,19 @@
+// This contains basic utility functions for the firmware.
+
+#ifndef UTIL_NXC
+#define UTIL_NXC
+
+// Convenience function to clamp a value between a given minimum and maximum
+long clamp(long val, long min, long max) {
+	if (val < min)
+		return min;
+
+	if (val > max)
+		return max;
+
+	return val;
+}
+
+
+#endif // UTIL_NXC
+// vim: syntax=c

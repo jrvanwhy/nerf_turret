@@ -1,44 +1,5 @@
-// Convenience function to clamp a value between a given minimum and maximum
-long clamp(long val, long min, long max) {
-	if (val < min)
-		return min;
-
-	if (val > max)
-		return max;
-
-	return val;
-}
-
-// Position control function. Takes in the motor to be controller,
-// current voltage, and a target position
-void posCont(byte motor, long tgt, long voltage) {
-	// Control gain
-	const long kp = 100000; // Percent millivolts per degree
-
-	// Maximum output absolute value
-	const long maxOut = 100;
-
-	// Maximum absolute error value before the control saturates.
-	long satErr = maxOut * voltage / kp;
-
-	// Compute the positioning error. The sign of this error matches
-	// the sign of the control input necessary to decrease the error.
-	long error = tgt - MotorRotationCount(motor);
-
-	// Check for error saturation, and set the maximum possible command if it's saturated.
-	// Otherwise, compute the command via proportional control.
-	// Checking the error prevents a possible long overflow.
-	long tau;
-	if (error > satErr)
-		tau = maxOut;
-	else if (error < -satErr)
-		tau = -maxOut;
-	else
-		tau = clamp(kp * error / voltage, -maxOut, maxOut);
-
-	// Write out the new command
-	OnFwd(motor, tau);
-}
+// Includes
+#include "pos_cont.nxc"
 
 // Polls for new updates from the host PC,
 // and processes any that have been received.

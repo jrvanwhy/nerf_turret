@@ -1,1 +1,12 @@
+#ifndef YAW_NXC
+#define YAW_NXC
+
+// Cyclic yaw control function. Should be called periodically
+// from main()
+void yaw_update() {
+	// TODO: This
+}
+
+#endif // YAW_NXC
+
 // vim: syntax=c

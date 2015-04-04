@@ -1,1 +1,19 @@
+#ifndef COMMS_NXC
+#define COMMS_NXC
+
+// Function to transmit an estop message to the host PC.
+// Unlike the other transmit functions, this sends immediately
+// rather than queueing the message because an EStop will stop the main loop.
+void comms_tx_estop() {
+	// TODO: This
+}
+
+// This should be called periodically from the main loop to
+// process messages from (and to) the host PC
+void comms_update() {
+	// TODO: This
+}
+
+#endif // COMMS_NXC
+
 // vim: syntax=c

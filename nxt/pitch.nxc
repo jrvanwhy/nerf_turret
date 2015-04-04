@@ -1,1 +1,11 @@
+#ifndef PITCH_NXC
+#define PITCH_NXC
+
+// Cyclic pitch control function
+void pitch_update() {
+	// TODO: This
+}
+
+#endif // PITCH_NXC
+
 // vim: syntax=c

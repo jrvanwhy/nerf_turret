@@ -1,0 +1,26 @@
+#ifndef ESTOP_NXC
+#define ESTOP_NXC
+
+// The EStop function. This is self-contained.
+void estop(string reason) {
+	// The indentation level for the reason code
+	const int indent_x = LCD_LINE7;
+
+	// Stop the motors as quickly as (reliably) possible
+	Off(OUT_ABC);
+
+	// Tell the host PC that we've estopped
+	comms_tx_estop();
+
+	// Indicate that an EStop has occurred and give the reason string.
+	TextOut(0,        LCD_LINE1, "Emergency Stop", DRAW_OPT_CLEAR_WHOLE_SCREEN);
+	TextOut(0,        LCD_LINE4, "Reason:");
+	TextOut(indent_x, LCD_LINE6, reason   );
+
+	// Loop infinitely to keep the error message on the screen but prevent the motors from re-activating
+	while (true);
+}
+
+#endif // ESTOP_NXC
+
+// vim: syntax=c

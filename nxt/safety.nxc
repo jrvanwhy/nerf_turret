@@ -1,1 +1,11 @@
+#ifndef SAFETY_NXC
+#define SAFETY_NXC
+
+// This should be called periodically from the main loop
+void safety_update() {
+	// TODO: This
+}
+
+#endif // SAFETY_NXC
+
 // vim: syntax=c

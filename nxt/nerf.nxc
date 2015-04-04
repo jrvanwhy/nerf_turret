@@ -1,6 +1,12 @@
 // Contains the main loop for the Nerf turret.
 // This simply calls out to the subsystems in an appropriate order.
 
+// Include the various sub-modules
+#include "comms.nxc"
+#include "pitch.nxc"
+#include "safety.nxc"
+#include "yaw.nxc"
+
 task main() {
 	// Main loop. If the program terminates, it will do so from one
 	// of the subsystems using abort()
@@ -10,12 +16,6 @@ task main() {
 
 		// Handle any messages from the control computer
 		comms_update();
-
-		// If we're not done calibrating, continue running the calibration routine
-		if (!calib_done()) {
-			calib_update();
-			continue;
-		}
 
 		// Execute the control subsystems
 		yaw_update();

@@ -1,6 +1,10 @@
 #ifndef YAW_NXC
 #define YAW_NXC
 
+// Configuration parameters
+const byte yaw_main_out = OUT_C; // The "main" yaw motor, the one which measures the yaw angle of the turret.
+const byte yaw_add_out  = OUT_B; // The "additional" yaw motor, which just augments the torque of the main motor.
+
 // Cyclic yaw control function. Should be called periodically
 // from main()
 void yaw_update() {

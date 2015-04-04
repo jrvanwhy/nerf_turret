@@ -1,9 +1,25 @@
 #ifndef SAFETY_NXC
 #define SAFETY_NXC
 
+// Includes -- other subsystems we need to access.
+#include "estop.nxc"
+#include "yaw.nxc"
+
+// Safety tolerances and other parameters
+const long safety_yaw_diff_tol = 0; // Maximum deviation between the two yaw motors.
+
 // This should be called periodically from the main loop
 void safety_update() {
-	// TODO: This
+	// First check if any of the buttons on the front have been pressed,
+	// and trigger an EStop if so.
+	if (ButtonCount(BTNLEFT, false) || ButtonCount(BTNCENTER, false) || ButtonCount(BTNRIGHT, false)) {
+		estop("Button Pressed");
+	}
+
+	// Check that the two yaw motors read within some tolerance of each other.
+	if (abs(MotorRotationCount(yaw_main_out) - MotorRotationCount(yaw_add_out)) > safety_yaw_diff_tol) {
+		estop("Yaw Motor Diff.");
+	}
 }
 
 #endif // SAFETY_NXC

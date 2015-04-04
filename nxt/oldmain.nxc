@@ -1,0 +1,161 @@
+// Includes
+#include "pos_cont.nxc"
+
+// Polls for new updates from the host PC,
+// and processes any that have been received.
+void hostComms() {
+	// TODO: This
+}
+
+// Trigger control system shared variables
+bool isFiring   = false;  // Whether or not we're currently firing
+long firingTime = 0;      // Total amount of time the gun has spent firing (doesn't include current pull, if firing now). Used to check for the out-of-ammo condition.
+bool hasAmmo    = true;   // Whether or not there's ammunition. Based on tracking firing duration.
+long fireSTime;           // The time at which we started firing -- this should already include the trigPullTime correction
+const byte trigPort = S4; // The port the triggering light is on
+
+// Function to begin firing. Safe to call if currently firing or out of ammo -- is a noop in those cases)
+void startFire() {
+	// Tuning parameters
+	const long trigPullTime = 500; // Time required to start firing, in milliseconds of firing time
+
+	// Don't do anything if there's no ammo or we're already firing
+	if (!hasAmmo || isFiring)
+		return;
+
+	// "Begin" firing
+	SetSensorLight(trigPort, true);
+	isFiring = true;
+
+	// Record the "start time" of the firing
+	fireSTime = CurrentTick() + trigPullTime;
+}
+
+// Function to end firing. Safe to call even if not firing (noop if not currently firing)
+void endFire() {
+	// Don't do anything if we're not already firing
+	if (!isFiring)
+		return;
+
+	// Stop firing
+	SetSensorLight(trigPort, false);
+	isFiring = false;
+
+	// Compute how long we just fired for
+	long addFireTime = CurrentTick() - fireSTime;
+
+	// Don't add the fire time if it was too short (i.e.
+	// if it wasn't long enough to actually pull the trigger)
+	if (addFireTime <= 0)
+		return;
+
+	// Add to the total firing time
+	firingTime = firingTime + addFireTime;
+}
+
+// Periodic trigger control function. Called
+// repeatedly by the main loop. Must be given
+// the battery level (in millivolts)
+void runTrigger(long voltage) {
+	// Trigger control parameters
+	const long magCapTime = 5000; // Magazine capacity, in milliseconds of firing time.
+
+	// If we're not firing, we don't need to do anything. Return early.
+	if (!isFiring)
+		return;
+
+	// Compute the total amount of firing time.
+	long totFiringTime = firingTime + CurrentTick() - fireSTime;
+
+	// Don't do anything if we still have ammo.
+	if (totFiringTime < magCapTime)
+		return;
+
+	// Stop firing and record that we're out of ammo
+	SetSensorLight(trigPort, false);
+	hasAmmo = false;
+}
+
+// Aiming system shared variables
+long aimTgt     = 0;     // Target aiming position, in degrees of motor rotation. Gear ratio: 56/16 == 3.5
+bool aimEnabled = false; // Whether or not the aiming controller is enabled.
+
+// Function to enable aiming control
+void enableAim() {
+	aimEnabled = true;
+}
+
+// Function to disable aiming control
+void disableAim() {
+	aimEnabled = false;
+	Coast(OUT_B); // runAim() will no longer send signals to the motor, so we need to shut it off ourselves.
+}
+
+// Periodic aiming function. Should be called repeatedly by the main loop.
+// Must be given the battery level (in millivolts)
+void runAim(long voltage) {
+	// If the aiming controller is disabled, quit immediately.
+	if (!aimEnabled)
+		return;
+
+	// Aiming is just position control. Redirect to the position controller
+	posCont(OUT_B, aimTgt, voltage);
+}
+
+task main() {
+	// Debugging
+	enableAim();
+	aimTgt = -200;
+	long sTime = CurrentTick();
+
+	startFire();
+
+	// Main control loop. This checks for new command messages
+	// at each iteration, then executes the relevant controllers.
+	int iter = 0;
+	while (true) {
+		// Poll for and process commands from the host PC
+		hostComms();
+
+		// Fake inputs for debugging purposes
+		switch (++iter) {
+			case 1000:
+				endFire();
+				break;
+
+			case 2000:
+				startFire();
+				break;
+
+			case 4000:
+				endFire();
+				break;
+
+			case 5000:
+				startFire();
+				break;
+
+			case 8000:
+				endFire();
+				break;
+		}
+
+		// Grab the battery voltage, which is used by the control algorithms
+		// to scale commands. This is a long because the functions which use it
+		// used signed long arithmetic to avoid overflows
+		long voltage = BatteryLevel(); // Unit: Millivolts
+
+		// Execute the trigger and aiming subsystems
+		runTrigger(voltage);
+		runAim(voltage);
+
+		// Safeties! Don't want to pull the NXT off the table (or damage the cables)...
+		long posB = MotorRotationCount(OUT_B);
+		if (posB > 250 || posB < -250) {
+			Off(OUT_ABC);
+			break;
+		}
+	}
+}
+
+// vim: syntax=c

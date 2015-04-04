@@ -14,8 +14,10 @@ void estop(string reason) {
 
 	// Indicate that an EStop has occurred and give the reason string.
 	TextOut(0,        LCD_LINE1, "Emergency Stop", DRAW_OPT_CLEAR_WHOLE_SCREEN);
-	TextOut(0,        LCD_LINE4, "Reason:");
-	TextOut(indent_x, LCD_LINE6, reason   );
+	TextOut(0,        LCD_LINE2, "################");
+	TextOut(0,        LCD_LINE3, "              ##");
+	TextOut(0,        LCD_LINE4, "Reason:        #");
+	TextOut(indent_x, LCD_LINE6, reason);
 
 	// Loop infinitely to keep the error message on the screen but prevent the motors from re-activating
 	while (true);

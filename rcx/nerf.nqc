@@ -23,7 +23,6 @@
 int state     = STATE_IDLE; // Current state machine state
 int isLightOn = false;      // Whether the NXT's light is on
 int holdCntr  = 0;          // For checking if light is flashing
-int stateCntr = 0;          // Number of iterations in this state.
 
 // Macro for checking if the light is being held
 #define IS_LIGHT_HOLD (holdCntr >= LIGHT_TOUT)
@@ -33,33 +32,17 @@ void state_idle() {
 	if (isLightOn) {
 		SetPower(ACC_MOTOR, OUT_FULL);
 		On(ACC_MOTOR);
-		state     = STATE_ACCPULL;
-		stateCntr = 0;
+		state = STATE_ACCPULL;
 	}
 }
 
 // Currently pulling the accelerator
 void state_accpull() {
-	// Update the state timer
-	++stateCntr;
-
-	// Check if the light's turned off.
-	// If so, shut off the accelerator winch and
-	// go back to STATE_IDLE
-	if (!isLightOn) {
-		if (IS_LIGHT_HOLD) {
-			Float(ACC_MOTOR);
-			state = STATE_IDLE;
-			return;
-		}
-	}
-
-	// Check if the pull's complete. If so, switch to
-	// STATE_ACCHOLD
-	if (stateCntr >= PULL_TIME) {
-		SetPower(ACC_MOTOR, HOLD_PWR);
-		state = STATE_ACCHOLD;
-	}
+	// Unconditionally go to state ACCHOLD -- the pull is faster
+	// than our hold identification, so it would never recognize
+	// a relax signal anyway.
+	SetPower(ACC_MOTOR, HOLD_PWR);
+	state = STATE_ACCHOLD;
 }
 
 // Holding the accelerator... "intimidate" mode.
@@ -78,7 +61,6 @@ void state_acchold() {
 		SetPower(TRIG_MOTOR, OUT_FULL);
 		On(TRIG_MOTOR);
 		state = STATE_TRIGPULL;
-		stateCntr = 0;
 	} else {
 		// Go to STATE_IDLE
 		Float(ACC_MOTOR);
@@ -88,9 +70,6 @@ void state_acchold() {
 
 // Pulling the trigger
 void state_trigpull() {
-	// Update the state counter
-	++stateCntr;
-
 	// Check if the light's turned off -- if so, go back to intimidate
 	if (!isLightOn) {
 		Float(TRIG_MOTOR);
@@ -98,12 +77,10 @@ void state_trigpull() {
 		return;
 	}
 
-	// Light's still on... if the timer's expired,
-	// go to STATE_FIRING
-	if (stateCntr >= PULL_TIME) {
-		SetPower(TRIG_MOTOR, HOLD_PWR);
-		state = STATE_FIRING;
-	}
+	// Like ACCPULL, we unconditionally switch if the light's
+	// still firing.
+	SetPower(TRIG_MOTOR, HOLD_PWR);
+	state = STATE_FIRING;
 }
 
 // Currently firing

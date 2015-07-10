@@ -1,15 +1,15 @@
 // Tuning values
 #define LIGHT_THRESH 63
-#define HOLD_PWR      0
-#define PULL_TIME    20
-#define LIGHT_TOUT   30
+#define HOLD_PWR      1
+#define PULL_TIME     5
+#define LIGHT_TOUT    2
+#define SMPL_PERIOD   4
 
-// Indexes
-#define LIGHT_IN    SENSOR_1
-#define ACC_MOTOR   OUT_A
-#define TRIG_MOTOR  OUT_C
-#define STATE_TIMER 0
-#define LIGHT_TIMER 1
+// Indices
+#define LIGHT_IN   SENSOR_1
+#define ACC_MOTOR  OUT_A
+#define TRIG_MOTOR OUT_C
+#define SMPL_TIMER 0
 
 // State machine states enumeration
 #define STATE_IDLE     0
@@ -20,67 +20,34 @@
 
 // Global state information, required
 // by every state in the state machine
-int state       = STATE_IDLE; // Current state machine state
-int isLightOn   = false;      // Whether the NXT's light is on
-int isLightHold = true;       // Whether the light is solid (vs. flashing)
+int state     = STATE_IDLE; // Current state machine state
+int isLightOn = false;      // Whether the NXT's light is on
+int holdCntr  = 0;          // For checking if light is flashing
+int stateCntr = 0;          // Number of iterations in this state.
 
-// This updates isLightOn
-void up_light_on() {
-	isLightOn = (LIGHT_IN > LIGHT_THRESH);
-}
-
-// Updates isLightOn and resets the light timer
-// if it changed
-void up_light_full() {
-	int newIsLightOn = (LIGHT_IN > LIGHT_THRESH);
-
-	if (isLightOn != newIsLightOn) {
-		isLightOn = newIsLightOn;
-		ClearTimer(LIGHT_TIMER);
-	}
-}
-
-// Checks the light timer and updates isLightHold
-void up_light_hold() {
-	isLightHold = (FastTimer(LIGHT_TIMER) >= LIGHT_TOUT);
-}
-
-// Efficiently updates both isLightOn and isLightHold
-void up_light_both() {
-	int newIsLightOn = (LIGHT_IN > LIGHT_THRESH);
-
-	if (isLightOn != newIsLightOn) {
-		isLightOn = newIsLightOn;
-		ClearTimer(LIGHT_TIMER);
-	} else {
-		isLightHold = (FastTimer(LIGHT_TIMER) >= LIGHT_TOUT);
-	}
-}
+// Macro for checking if the light is being held
+#define IS_LIGHT_HOLD (holdCntr >= LIGHT_TOUT)
 
 // Idle state -- waiting to begin firing
 void state_idle() {
-	up_light_on();
-
 	if (isLightOn) {
 		SetPower(ACC_MOTOR, OUT_FULL);
 		On(ACC_MOTOR);
-		ClearTimer(LIGHT_TIMER);
-		state = STATE_ACCPULL;
-		ClearTimer(STATE_TIMER);
+		state     = STATE_ACCPULL;
+		stateCntr = 0;
 	}
 }
 
 // Currently pulling the accelerator
 void state_accpull() {
-	up_light_full();
+	// Update the state timer
+	++stateCntr;
 
 	// Check if the light's turned off.
 	// If so, shut off the accelerator winch and
 	// go back to STATE_IDLE
 	if (!isLightOn) {
-		up_light_hold();
-
-		if (isLightHold) {
+		if (IS_LIGHT_HOLD) {
 			Float(ACC_MOTOR);
 			state = STATE_IDLE;
 			return;
@@ -89,7 +56,7 @@ void state_accpull() {
 
 	// Check if the pull's complete. If so, switch to
 	// STATE_ACCHOLD
-	if (FastTimer(STATE_TIMER) >= PULL_TIME) {
+	if (stateCntr >= PULL_TIME) {
 		SetPower(ACC_MOTOR, HOLD_PWR);
 		state = STATE_ACCHOLD;
 	}
@@ -99,8 +66,7 @@ void state_accpull() {
 void state_acchold() {
 	// Don't do anything if the light isn't solid.
 	// (i.e. if it's flashing, stay in this mode.
-	up_light_both();
-	if (!isLightHold) {
+	if (!IS_LIGHT_HOLD) {
 		return;
 	}
 
@@ -112,7 +78,7 @@ void state_acchold() {
 		SetPower(TRIG_MOTOR, OUT_FULL);
 		On(TRIG_MOTOR);
 		state = STATE_TRIGPULL;
-		ClearTimer(STATE_TIMER);
+		stateCntr = 0;
 	} else {
 		// Go to STATE_IDLE
 		Float(ACC_MOTOR);
@@ -122,18 +88,19 @@ void state_acchold() {
 
 // Pulling the trigger
 void state_trigpull() {
+	// Update the state counter
+	++stateCntr;
+
 	// Check if the light's turned off -- if so, go back to intimidate
-	up_light_on();
 	if (!isLightOn) {
 		Float(TRIG_MOTOR);
-		ClearTimer(LIGHT_TIMER);
 		state = STATE_ACCHOLD;
 		return;
 	}
 
 	// Light's still on... if the timer's expired,
 	// go to STATE_FIRING
-	if (FastTimer(STATE_TIMER) >= PULL_TIME) {
+	if (stateCntr >= PULL_TIME) {
 		SetPower(TRIG_MOTOR, HOLD_PWR);
 		state = STATE_FIRING;
 	}
@@ -143,10 +110,8 @@ void state_trigpull() {
 void state_firing() {
 	// Check if the light's turned off -- if so, go right back to
 	// intimidate mode.
-	up_light_on();
 	if (!isLightOn) {
 		Float(TRIG_MOTOR);
-		ClearTimer(LIGHT_TIMER);
 		state = STATE_ACCHOLD;
 		return;
 	}
@@ -159,6 +124,25 @@ task main()
 
 	// Main loop
 	while (true) {
+		// Debugging: Performance check. TODO: Remove
+		if (FastTimer(SMPL_TIMER) >= SMPL_PERIOD) {
+			break;
+		}
+
+		// Wait until it's time to sample again, then reset the timer and sample
+		while (FastTimer(SMPL_TIMER) < SMPL_PERIOD);
+		ClearTimer(SMPL_TIMER);
+		int newIsLightOn = (LIGHT_IN > LIGHT_THRESH);
+
+		// Check if the light just changed or if it's holding
+		// its previous value.
+		if (isLightOn == newIsLightOn) {
+			++holdCntr;
+		} else {
+			isLightOn = newIsLightOn;
+			holdCntr  = 0;
+		}
+
 		// Run the function for the current state
 		switch (state) {
 			case STATE_IDLE:

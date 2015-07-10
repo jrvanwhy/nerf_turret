@@ -3,7 +3,7 @@
 #define HOLD_PWR      1
 #define PULL_TIME     5
 #define LIGHT_TOUT    2
-#define SMPL_PERIOD   4
+#define SMPL_PERIOD  10
 
 // Indices
 #define LIGHT_IN   SENSOR_1
@@ -121,6 +121,9 @@ task main()
 {
 	// Initialization
 	SetSensor(LIGHT_IN, SENSOR_LIGHT);
+
+	// Reset the timer or it exits immediately
+	ClearTimer(SMPL_TIMER);
 
 	// Main loop
 	while (true) {

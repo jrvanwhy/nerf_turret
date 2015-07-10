@@ -1,7 +1,7 @@
 // Tuning values
 #define LIGHT_THRESH 63
-#define HOLD_PWR      1
-#define PULL_TIME     5
+#define ACCHOLD_PWR   1
+#define TRGHOLD_PWR   3
 #define LIGHT_TOUT    2
 #define SMPL_PERIOD  10
 
@@ -41,7 +41,7 @@ void state_accpull() {
 	// Unconditionally go to state ACCHOLD -- the pull is faster
 	// than our hold identification, so it would never recognize
 	// a relax signal anyway.
-	SetPower(ACC_MOTOR, HOLD_PWR);
+	SetPower(ACC_MOTOR, ACCHOLD_PWR);
 	state = STATE_ACCHOLD;
 }
 
@@ -79,7 +79,7 @@ void state_trigpull() {
 
 	// Like ACCPULL, we unconditionally switch if the light's
 	// still firing.
-	SetPower(TRIG_MOTOR, HOLD_PWR);
+	SetPower(TRIG_MOTOR, TRGHOLD_PWR);
 	state = STATE_FIRING;
 }
 
@@ -117,7 +117,9 @@ task main()
 		// Check if the light just changed or if it's holding
 		// its previous value.
 		if (isLightOn == newIsLightOn) {
-			++holdCntr;
+			if (holdCntr < LIGHT_TOUT) {
+				++holdCntr;
+			}
 		} else {
 			isLightOn = newIsLightOn;
 			holdCntr  = 0;

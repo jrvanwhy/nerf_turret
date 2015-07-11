@@ -1,6 +1,6 @@
 // Tuning values
 #define LIGHT_THRESH 63
-#define ACCHOLD_PWR   1
+#define ACCHOLD_PWR   0
 #define TRGHOLD_PWR   3
 #define LIGHT_TOUT    2
 #define SMPL_PERIOD  10

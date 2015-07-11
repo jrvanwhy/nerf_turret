@@ -1,6 +1,9 @@
 #ifndef ESTOP_NXC
 #define ESTOP_NXC
 
+// Included so we can command the blaster to stop firing
+#include "blaster.nxc"
+
 // The EStop function. This is self-contained.
 void estop(string reason) {
 	// The indentation level for the reason code
@@ -8,6 +11,9 @@ void estop(string reason) {
 
 	// Stop the motors as quickly as (reliably) possible
 	Off(OUT_ABC);
+
+	// Shut off the blaster
+	blaster_estop();
 
 	// Tell the host PC that we've estopped
 	comms_tx_estop();

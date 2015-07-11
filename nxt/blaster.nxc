@@ -1,0 +1,80 @@
+#ifndef BLASTER_NXC
+#define BLASTER_NXC
+
+// Blaster commands
+#define BLASTER_OFF  0
+#define BLASTER_HOLD 1
+#define BLASTER_FIRE 2
+
+// Blaster control light sensor port
+#define BLASTER_PORT S4
+
+// Light switch time (ms)
+#define BLASTER_SWITCH_DUR 150
+
+// Current blaster command
+byte blaster_cmd = BLASTER_OFF;
+
+// Last time the light switched (for hold mode)
+unsigned long blaster_t_switch;
+
+// Whether the light is on
+bool blaster_light_on = false;
+
+// Blaster estop function. Should shut off the blaster
+void blaster_estop() {
+	// Unconditionally disable the light.
+	SetSensorLight(BLASTER_PORT, false);
+}
+
+// Command to stop firing the blaster
+void blaster_stop() {
+	// Update the stored command
+	blaster_cmd = BLASTER_OFF;
+
+	// If this should change the light color, turn it off and record the change.
+	if (blaster_light_on) {
+		SetSensorLight(BLASTER_PORT, false);
+		blaster_light_on = false;
+	}
+}
+
+// Command to "hold" the accelerator on
+void blaster_hold() {
+	// Update the stored command. update_blaster() sets the light's value.
+	blaster_cmd = BLASTER_HOLD;
+
+	// Instantly flip the light and start the switch timer
+	blaster_light_on = !blaster_light_on;
+	blaster_t_switch = CurrentTick();
+	SetSensorLight(BLASTER_PORT, blaster_light_on);
+}
+
+// Fire the blatser
+void blaster_fire() {
+	// Update the stored command
+	blaster_cmd = BLASTER_FIRE;
+
+	// Update the light color if this should change it
+	if (!blaster_light_on) {
+		SetSensorLight(BLASTER_PORT);
+		blaster_light_on = true;
+	}
+}
+
+// Cyclic blaster control function. Should be called periodically from main()
+void blaster_update() {
+	// We only need to act if we're in hold mode.
+	if (blaster_cmd == BLASTER_HOLD) {
+		// Switch the light if it's been on for long enough.
+		if (CurrentTick() - blaster_t_switch >= BLASTER_SWITCH_DUR) {
+			blaster_light_on = !blaster_light_on;
+			SetSensorLight(BLASTER_PORT, blaster_light_on);
+			blaster_t_switch += BLASTER_SWITCH_DUR;
+		}
+	}
+}
+
+#endif // BLASTER_NXC
+
+// vim: syntax=c

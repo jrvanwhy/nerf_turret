@@ -2,6 +2,7 @@
 // This simply calls out to the subsystems in an appropriate order.
 
 // Include the various sub-modules
+#include "blaster.nxc"
 #include "comms.nxc"
 #include "pitch.nxc"
 #include "safety.nxc"
@@ -18,6 +19,7 @@ task main() {
 		comms_update();
 
 		// Execute the control subsystems
+		blaster_update();
 		yaw_update();
 		pitch_update();
 	}

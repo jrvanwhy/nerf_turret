@@ -82,7 +82,7 @@ void comms_update() {
 
 			default:
 				// Invalid packet; estop
-				estop("Invalid packet.");
+				estop("Invalid packet");
 		}
 	}
 }

@@ -31,11 +31,13 @@ void comms_update() {
 	// Buffer the message will be stored into
 	string rx_buf;
 
-	// Try to receive a message
-	char success = ReceiveMessage(COMM_RX_MAILBOX, true, rx_buf);
+	// Try to receive a message. The return value of ReceiveMessage()
+	// is the opposite of its documentation, hence the "was_empty"
+	// rather than "success" name for the return value variable.
+	char was_empty = ReceiveMessage(COMM_RX_MAILBOX, true, rx_buf);
 
-	// Quit now if we didn't receive anything
-	if (!success) {
+	// Quit now if we didn't receive anything.
+	if (was_empty) {
 		return;
 	}
 

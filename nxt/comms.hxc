@@ -1,0 +1,15 @@
+#ifndef COMMS_HXC
+#define COMMS_HXC
+
+// Function to transmit an estop message to the host PC.
+// Unlike the other transmit functions, this sends immediately
+// rather than queueing the message because an EStop will stop the main loop.
+void comms_tx_estop();
+
+// This should be called periodically from the main loop to
+// process messages from (and to) the host PC
+void comms_update();
+
+#endif // COMMS_HXC
+
+// vim: syntax=c

@@ -1,17 +1,88 @@
 #ifndef COMMS_NXC
 #define COMMS_NXC
 
-// Function to transmit an estop message to the host PC.
-// Unlike the other transmit functions, this sends immediately
-// rather than queueing the message because an EStop will stop the main loop.
+// Include the subsystems we control
+#include "blaster.nxc"
+#include "estop.nxc"
+
+// Host -> NXT Command IDs
+#define COMM_SETYAW_ID       1
+#define COMM_SETPITCH_ID     2
+#define COMM_SETRELYAW_ID    3
+#define COMM_SETRELPITCH_ID  4
+#define COMM_ZEROYAW_ID      5
+#define COMM_SHOOTBEGIN_ID   7
+#define COMM_SHOOTEND_ID     8
+#define COMM_SHOOTHOLD_ID    9
+#define COMM_ENABLEYAW_ID   10
+#define COMM_ENABLEPITCH_ID 11
+#define COMM_QUERYYAW_ID    12
+#define COMM_QUERYPITCH_ID  13
+#define COMM_ABORT_ID       14
+
+// Mailboxes
+#define COMM_RX_MAILBOX MAILBOX1
+
 void comms_tx_estop() {
 	// TODO: This
 }
 
-// This should be called periodically from the main loop to
-// process messages from (and to) the host PC
 void comms_update() {
-	// TODO: This
+	// Buffer the message will be stored into
+	string rx_buf;
+
+	// Try to receive a message
+	char success = ReceiveMessage(COMM_RX_MAILBOX, true, rx_buf);
+
+	// Quit now if we didn't receive anything
+	if (!success) {
+		return;
+	}
+
+	// Length of the received packet
+	int msg_len = strlen(rx_buf);
+
+	// Current packet position within the string
+	unsigned int cur_loc = 0;
+
+	// Iterate until we're done processing all the commands
+	while (cur_loc < msg_len) {
+		// Switch on the command ID byte
+		switch (rx_buf[cur_loc]) {
+			case COMM_SETYAW_ID:
+			case COMM_SETPITCH_ID:
+			case COMM_SETRELYAW_ID:
+			case COMM_SETRELPITCH_ID:
+			case COMM_ZEROYAW_ID:
+				estop("TODO");
+
+			case COMM_SHOOTBEGIN_ID:
+				blaster_fire();
+				cur_loc += 1;
+				break;
+
+			case COMM_SHOOTEND_ID:
+				blaster_stop();
+				cur_loc += 1;
+				break;
+
+			case COMM_SHOOTHOLD_ID:
+				blaster_hold();
+				cur_loc += 1;
+				break;
+
+			case COMM_ENABLEYAW_ID:
+			case COMM_ENABLEPITCH_ID:
+			case COMM_QUERYYAW_ID:
+			case COMM_QUERYPITCH_ID:
+			case COMM_ABORT_ID:
+				estop("TODO");
+
+			default:
+				// Invalid packet; estop
+				estop("Invalid packet.");
+		}
+	}
 }
 
 #endif // COMMS_NXC

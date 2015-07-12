@@ -5,6 +5,9 @@
 #define PITCH_CALIB_PORT S1
 #define PITCH_CALIB_SENSOR SENSOR_1
 
+// We continue to run the safeties during the calibration process.
+#include "safety.nxc"
+
 // Call-once initialization function
 void pitch_init() {
 	// Configure the calibration sensor as a touch sensor
@@ -14,11 +17,12 @@ void pitch_init() {
 // Call-once pitch calibration function
 void pitch_calibrate() {
 	// Raise the pitch until the touch sensor is released.
-	while (PITCH_CALIB_SENSOR) OnRev(PITCH_MOT, 100);
+	OnRev(PITCH_MOT, 100);
+	while (PITCH_CALIB_SENSOR) safety_update();
 
 	// Decrease pitch until the touch sensor is pressed again.
 	OnFwd(PITCH_MOT, 100);
-	while (!PITCH_CALIB_SENSOR);
+	while (!PITCH_CALIB_SENSOR) safety_update();
 
 	// Set the current position to 0 and shut off the pitch motor.
 	ResetRotationCount(PITCH_MOT);

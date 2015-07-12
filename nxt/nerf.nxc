@@ -9,6 +9,12 @@
 #include "yaw.nxc"
 
 task main() {
+	// Initialize subsystems that need initialization
+	pitch_init();
+
+	// Run the calibration sequence.
+	pitch_calibrate();
+
 	// Main loop. If the program terminates, it will do so from one
 	// of the subsystems using abort()
 	while (true) {
@@ -20,8 +26,8 @@ task main() {
 
 		// Execute the control subsystems
 		blaster_update();
-		yaw_update();
 		pitch_update();
+		yaw_update();
 	}
 }
 

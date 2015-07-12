@@ -1,6 +1,30 @@
 #ifndef PITCH_NXC
 #define PITCH_NXC
 
+#define PITCH_MOT OUT_A
+#define PITCH_CALIB_PORT S1
+#define PITCH_CALIB_SENSOR SENSOR_1
+
+// Call-once initialization function
+void pitch_init() {
+	// Configure the calibration sensor as a touch sensor
+	SetSensorTouch(PITCH_CALIB_PORT);
+}
+
+// Call-once pitch calibration function
+void pitch_calibrate() {
+	// Raise the pitch until the touch sensor is released.
+	while (PITCH_CALIB_SENSOR) OnRev(PITCH_MOT, 100);
+
+	// Decrease pitch until the touch sensor is pressed again.
+	OnFwd(PITCH_MOT, 100);
+	while (!PITCH_CALIB_SENSOR);
+
+	// Set the current position to 0 and shut off the pitch motor.
+	ResetRotationCount(PITCH_MOT);
+	Off(PITCH_MOT);
+}
+
 // Cyclic pitch control function
 void pitch_update() {
 	// TODO: This

@@ -8,7 +8,7 @@ const byte yaw_main_out = OUT_C; // The "main" yaw motor, the one which measures
 const byte yaw_add_out  = OUT_B; // The "additional" yaw motor, which just augments the torque of the main motor.
 
 // Yaw position limits
-const long yaw_min_tgt = 21 * -90;
+const long yaw_min_tgt = -100;
 const long yaw_max_tgt = 21 * 90;
 
 // "Center" target position.
@@ -17,9 +17,19 @@ long yaw_center = 0;
 // Current yaw target
 long yaw_tgt = 0;
 
+// Get the current yaw "position" -- offset by yaw_center.
+long yaw_get() {
+	return MotorRotationCount(yaw_main_out) - yaw_center;
+}
+
 // Set the yaw target
 void yaw_set(int new_tgt) {
 	yaw_tgt = clamp(new_tgt + yaw_center, yaw_min_tgt, yaw_max_tgt);
+}
+
+// Set the current position as the "zero" point for the yaw controller
+void yaw_zero() {
+	yaw_center = MotorRotationCount(yaw_main_out);
 }
 
 // Cyclic yaw control function. Should be called periodically

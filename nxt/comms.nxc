@@ -73,7 +73,8 @@ void comms_update() {
 				break;
 
 			case COMM_SETRELYAW_ID:
-				estop("TODO");
+				yaw_set(yaw_get() + comms_decode_int(rx_buf[cur_loc+1], rx_buf[cur_loc+2]));
+				cur_loc += 3;
 				break;
 
 			case COMM_SETRELPITCH_ID:
@@ -82,7 +83,8 @@ void comms_update() {
 				break;
 
 			case COMM_ZEROYAW_ID:
-				estop("TODO");
+				yaw_zero();
+				cur_loc += 1;
 				break;
 
 			case COMM_SHOOTBEGIN_ID:
@@ -101,12 +103,18 @@ void comms_update() {
 				break;
 
 			case COMM_QUERYYAW_ID:
-				estop("TODO");
+				string yaw_msg_num = NumToStr(yaw_get());
+				byte yaw_resp_id[] = {1, 0};
+				yaw_resp_id[1] = strlen(yaw_msg_num);
+				comm_tx_buf = StrCat(comm_tx_buf, ByteArrayToStr(yaw_resp_id), yaw_msg_num);
+				cur_loc += 1;
 				break;
 
 			case COMM_QUERYPITCH_ID:
-				byte resp_id[] = {2};
-				comm_tx_buf = StrCat(comm_tx_buf, ByteArrayToStr(resp_id), NumToStr(pitch_get()));
+				string pitch_msg_num = NumToStr(pitch_get());
+				byte pitch_resp_id[] = {2, 0};
+				pitch_resp_id[1] = strlen(pitch_msg_num);
+				comm_tx_buf = StrCat(comm_tx_buf, ByteArrayToStr(pitch_resp_id), pitch_msg_num);
 				cur_loc += 1;
 				break;
 

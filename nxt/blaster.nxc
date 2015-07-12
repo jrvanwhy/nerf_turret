@@ -2,18 +2,18 @@
 #define BLASTER_NXC
 
 // Blaster commands
-#define BLASTER_OFF  0
-#define BLASTER_HOLD 1
-#define BLASTER_FIRE 2
+const byte blaster_state_off  = 0;
+const byte blaster_state_hold = 1;
+const byte blaster_state_fire = 2;
 
 // Blaster control light sensor port
-#define BLASTER_PORT S4
+const byte blaster_port = S4;
 
 // Light switch time (ms)
-#define BLASTER_SWITCH_DUR 150
+const unsigned long blaster_switch_dur = 150;
 
 // Current blaster command
-byte blaster_cmd = BLASTER_OFF;
+byte blaster_cmd = blaster_state_off;
 
 // Last time the light switched (for hold mode)
 unsigned long blaster_t_switch;
@@ -24,17 +24,17 @@ bool blaster_light_on = false;
 // Blaster estop function. Should shut off the blaster
 void blaster_estop() {
 	// Unconditionally disable the light.
-	SetSensorLight(BLASTER_PORT, false);
+	SetSensorLight(blaster_port, false);
 }
 
 // Command to stop firing the blaster
 void blaster_stop() {
 	// Update the stored command
-	blaster_cmd = BLASTER_OFF;
+	blaster_cmd = blaster_state_off;
 
 	// If this should change the light color, turn it off and record the change.
 	if (blaster_light_on) {
-		SetSensorLight(BLASTER_PORT, false);
+		SetSensorLight(blaster_port, false);
 		blaster_light_on = false;
 	}
 }
@@ -42,22 +42,22 @@ void blaster_stop() {
 // Command to "hold" the accelerator on
 void blaster_hold() {
 	// Update the stored command. update_blaster() sets the light's value.
-	blaster_cmd = BLASTER_HOLD;
+	blaster_cmd = blaster_state_hold;
 
 	// Instantly flip the light and start the switch timer
 	blaster_light_on = !blaster_light_on;
 	blaster_t_switch = CurrentTick();
-	SetSensorLight(BLASTER_PORT, blaster_light_on);
+	SetSensorLight(blaster_port, blaster_light_on);
 }
 
 // Fire the blatser
 void blaster_fire() {
 	// Update the stored command
-	blaster_cmd = BLASTER_FIRE;
+	blaster_cmd = blaster_state_fire;
 
 	// Update the light color if this should change it
 	if (!blaster_light_on) {
-		SetSensorLight(BLASTER_PORT);
+		SetSensorLight(blaster_port);
 		blaster_light_on = true;
 	}
 }
@@ -65,12 +65,12 @@ void blaster_fire() {
 // Cyclic blaster control function. Should be called periodically from main()
 void blaster_update() {
 	// We only need to act if we're in hold mode.
-	if (blaster_cmd == BLASTER_HOLD) {
+	if (blaster_cmd == blaster_state_hold) {
 		// Switch the light if it's been on for long enough.
-		if (CurrentTick() - blaster_t_switch >= BLASTER_SWITCH_DUR) {
+		if (CurrentTick() >= blaster_t_switch + blaster_switch_dur) {
 			blaster_light_on = !blaster_light_on;
-			SetSensorLight(BLASTER_PORT, blaster_light_on);
-			blaster_t_switch += BLASTER_SWITCH_DUR;
+			SetSensorLight(blaster_port, blaster_light_on);
+			blaster_t_switch += blaster_switch_dur;
 		}
 	}
 }

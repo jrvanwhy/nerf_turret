@@ -15,15 +15,16 @@
 #define COMM_SHOOTBEGIN_ID   7
 #define COMM_SHOOTEND_ID     8
 #define COMM_SHOOTHOLD_ID    9
-#define COMM_ENABLEYAW_ID   10
-#define COMM_ENABLEPITCH_ID 11
 #define COMM_QUERYYAW_ID    12
 #define COMM_QUERYPITCH_ID  13
 #define COMM_ABORT_ID       14
 
 // Mailboxes
 #define COMM_RX_MAILBOX MAILBOX1
-#define COMM_TX_MAILBOX MAILBOX1
+#define COMM_TX_MAILBOX MAILBOX2
+
+// Transmit buffer
+string comm_tx_buf = "";
 
 void comms_tx_estop() {
 	byte estop_msg_bytes[] = {3};
@@ -97,18 +98,29 @@ void comms_update() {
 				cur_loc += 1;
 				break;
 
-			case COMM_ENABLEYAW_ID:
-			case COMM_ENABLEPITCH_ID:
 			case COMM_QUERYYAW_ID:
-			case COMM_QUERYPITCH_ID:
-			case COMM_ABORT_ID:
 				estop("TODO");
 				break;
+
+			case COMM_QUERYPITCH_ID:
+				byte resp_id[] = {2};
+				comm_tx_buf = StrCat(comm_tx_buf, ByteArrayToStr(resp_id), NumToStr(pitch_get()));
+				cur_loc += 1;
+				break;
+
+			case COMM_ABORT_ID:
+				abort();
 
 			default:
 				// Invalid packet; estop
 				estop("Invalid packet");
 		}
+	}
+
+	// Transmit if we need to
+	if (strlen(comm_tx_buf) > 0) {
+		SendMessage(COMM_TX_MAILBOX, comm_tx_buf);
+		comm_tx_buf = "";
 	}
 }
 

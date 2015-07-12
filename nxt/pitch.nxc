@@ -5,8 +5,11 @@
 #define PITCH_CALIB_PORT S1
 #define PITCH_CALIB_SENSOR SENSOR_1
 
-// We continue to run the safeties during the calibration process.
+#include "pos_cont.nxc"
 #include "safety.nxc"
+
+// Current position target
+long pitch_tgt = 0;
 
 // Call-once initialization function
 void pitch_init() {
@@ -31,7 +34,8 @@ void pitch_calibrate() {
 
 // Cyclic pitch control function
 void pitch_update() {
-	// TODO: This
+	// Redirect to the position controller.
+	pos_cont(PITCH_MOT, PITCH_MOT, pitch_tgt);
 }
 
 #endif // PITCH_NXC

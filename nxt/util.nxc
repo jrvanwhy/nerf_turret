@@ -1,0 +1,18 @@
+#ifndef UTIL_NXC
+#define UTIL_NXC
+
+long clamp(long val, long min, long max) {
+	if (val <= min) {
+		return min;
+	}
+
+	if (val >= max) {
+		return max;
+	}
+
+	return val;
+}
+
+#endif // UTIL_NXC
+
+// vim: syntax=c

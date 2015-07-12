@@ -8,8 +8,20 @@
 #include "pos_cont.nxc"
 #include "safety.nxc"
 
+// Minimum and maximum position targets
+const long pitch_min_tgt = -2200;
+const long pitch_max_tgt =   200;
+
+// Calibrated center position
+long calib_pos = 0;
+
 // Current position target
 long pitch_tgt = 0;
+
+// Set the pitch target
+void pitch_set(int new_tgt) {
+	pitch_tgt = clamp(new_tgt, pitch_min_tgt, pitch_max_tgt);
+}
 
 // Call-once initialization function
 void pitch_init() {
@@ -22,20 +34,24 @@ void pitch_calibrate() {
 	// Raise the pitch until the touch sensor is released.
 	OnRev(PITCH_MOT, 100);
 	while (PITCH_CALIB_SENSOR) safety_update();
+	Off(PITCH_MOT);
+
+	// Wait a bit for things to settle.
+	Wait(1000);
 
 	// Decrease pitch until the touch sensor is pressed again.
 	OnFwd(PITCH_MOT, 100);
 	while (!PITCH_CALIB_SENSOR) safety_update();
 
 	// Set the current position to 0 and shut off the pitch motor.
-	ResetRotationCount(PITCH_MOT);
+	calib_pos = MotorRotationCount(PITCH_MOT);
 	Off(PITCH_MOT);
 }
 
 // Cyclic pitch control function
 void pitch_update() {
 	// Redirect to the position controller.
-	pos_cont(PITCH_MOT, PITCH_MOT, pitch_tgt);
+	pos_cont(PITCH_MOT, PITCH_MOT, calib_pos + pitch_tgt);
 }
 
 #endif // PITCH_NXC

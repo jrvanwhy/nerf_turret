@@ -4,6 +4,7 @@
 // Include the subsystems we control
 #include "blaster.nxc"
 #include "estop.nxc"
+#include "pitch.nxc"
 
 // Host -> NXT Command IDs
 #define COMM_SETYAW_ID       1
@@ -28,6 +29,11 @@ void comms_tx_estop() {
 	byte estop_msg_bytes[] = {3};
 	string estop_msg_str = ByteArrayToStr(estop_msg_bytes);
 	SendMessage(COMM_TX_MAILBOX, estop_msg_str);
+}
+
+// Function to decode a signed integer.
+int comms_decode_int(byte lsb, char msb) {
+	return UCHAR_MAX * msb + lsb;
 }
 
 void comms_update() {
@@ -55,11 +61,19 @@ void comms_update() {
 		// Switch on the command ID byte
 		switch (rx_buf[cur_loc]) {
 			case COMM_SETYAW_ID:
+				estop("TODO");
+				break;
+
 			case COMM_SETPITCH_ID:
+				pitch_set(comms_decode_int(rx_buf[cur_loc+1], rx_buf[cur_loc+2]));
+				cur_loc += 3;
+				break;
+
 			case COMM_SETRELYAW_ID:
 			case COMM_SETRELPITCH_ID:
 			case COMM_ZEROYAW_ID:
 				estop("TODO");
+				break;
 
 			case COMM_SHOOTBEGIN_ID:
 				blaster_fire();
@@ -82,6 +96,7 @@ void comms_update() {
 			case COMM_QUERYPITCH_ID:
 			case COMM_ABORT_ID:
 				estop("TODO");
+				break;
 
 			default:
 				// Invalid packet; estop

@@ -12,7 +12,7 @@ const long safety_yaw_diff_tol = 0; // Maximum deviation between the two yaw mot
 void safety_update() {
 	// First check if any of the buttons on the front have been pressed,
 	// and trigger an EStop if so.
-	if (ButtonCount(BTNLEFT, false) || ButtonCount(BTNCENTER, false) || ButtonCount(BTNRIGHT, false)) {
+	if (ButtonPressed(BTNLEFT, false) || ButtonPressed(BTNCENTER, false) || ButtonPressed(BTNRIGHT, false)) {
 		estop("Button Pressed");
 	}
 

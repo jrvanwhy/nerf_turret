@@ -22,9 +22,12 @@
 
 // Mailboxes
 #define COMM_RX_MAILBOX MAILBOX1
+#define COMM_TX_MAILBOX MAILBOX1
 
 void comms_tx_estop() {
-	// TODO: This
+	byte estop_msg_bytes[] = {3};
+	string estop_msg_str = ByteArrayToStr(estop_msg_bytes);
+	SendMessage(COMM_TX_MAILBOX, estop_msg_str);
 }
 
 void comms_update() {

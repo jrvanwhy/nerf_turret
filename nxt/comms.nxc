@@ -70,7 +70,14 @@ void comms_update() {
 				break;
 
 			case COMM_SETRELYAW_ID:
+				estop("TODO");
+				break;
+
 			case COMM_SETRELPITCH_ID:
+				pitch_set(pitch_get() + comms_decode_int(rx_buf[cur_loc+1], rx_buf[cur_loc+2]));
+				cur_loc += 3;
+				break;
+
 			case COMM_ZEROYAW_ID:
 				estop("TODO");
 				break;

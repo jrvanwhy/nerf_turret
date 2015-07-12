@@ -9,7 +9,7 @@
 #include "safety.nxc"
 
 // Minimum and maximum position targets
-const long pitch_min_tgt = -2200;
+const long pitch_min_tgt = -2300;
 const long pitch_max_tgt =   200;
 
 // Calibrated center position
@@ -21,6 +21,11 @@ long pitch_tgt = 0;
 // Set the pitch target
 void pitch_set(int new_tgt) {
 	pitch_tgt = clamp(new_tgt, pitch_min_tgt, pitch_max_tgt);
+}
+
+// Get the current pitch position
+int pitch_get() {
+	return MotorRotationCount(PITCH_MOT) - calib_pos;
 }
 
 // Call-once initialization function

@@ -8,7 +8,7 @@
 
 // Takes in the motor to be read, motors to be commanded,
 // and a target position
-void pos_cont(byte sense_motor, byte out_motor, long tgt) {
+long pos_cont(byte motor, long tgt) {
 	// Control gain
 	const long kp = 50000; // Percent millivolts per degree
 
@@ -23,7 +23,7 @@ void pos_cont(byte sense_motor, byte out_motor, long tgt) {
 
 	// Compute the positioning error. The sign of this error matches
 	// the sign of the control input necessary to decrease the error.
-	long error = tgt - MotorRotationCount(sense_motor);
+	long error = tgt - MotorRotationCount(motor);
 
 	// Check for error saturation, and set the maximum possible command if it's saturated.
 	// Otherwise, compute the command via proportional control.
@@ -37,7 +37,8 @@ void pos_cont(byte sense_motor, byte out_motor, long tgt) {
 		tau = clamp(kp * error / voltage, -maxOut, maxOut);
 
 	// Write out the new command
-	OnFwd(out_motor, tau);
+	OnFwd(motor, tau);
+	return tau;
 }
 
 #endif // POS_CONT_NXC

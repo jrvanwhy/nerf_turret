@@ -5,6 +5,7 @@
 #include "blaster.nxc"
 #include "estop.nxc"
 #include "pitch.nxc"
+#include "yaw.nxc"
 
 // Host -> NXT Command IDs
 #define COMM_SETYAW_ID       1
@@ -62,7 +63,8 @@ void comms_update() {
 		// Switch on the command ID byte
 		switch (rx_buf[cur_loc]) {
 			case COMM_SETYAW_ID:
-				estop("TODO");
+				yaw_set(comms_decode_int(rx_buf[cur_loc+1], rx_buf[cur_loc+2]));
+				cur_loc += 3;
 				break;
 
 			case COMM_SETPITCH_ID:

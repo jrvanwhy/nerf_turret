@@ -56,7 +56,7 @@ void pitch_calibrate() {
 // Cyclic pitch control function
 void pitch_update() {
 	// Redirect to the position controller.
-	pos_cont(PITCH_MOT, PITCH_MOT, calib_pos + pitch_tgt);
+	pos_cont(PITCH_MOT, calib_pos + pitch_tgt);
 }
 
 #endif // PITCH_NXC

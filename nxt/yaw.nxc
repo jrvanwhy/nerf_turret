@@ -1,14 +1,32 @@
 #ifndef YAW_NXC
 #define YAW_NXC
 
+#include "pos_cont.nxc"
+
 // Configuration parameters
 const byte yaw_main_out = OUT_C; // The "main" yaw motor, the one which measures the yaw angle of the turret.
 const byte yaw_add_out  = OUT_B; // The "additional" yaw motor, which just augments the torque of the main motor.
 
+// Yaw position limits
+const long yaw_min_tgt = 21 * -90;
+const long yaw_max_tgt = 21 * 90;
+
+// "Center" target position.
+long yaw_center = 0;
+
+// Current yaw target
+long yaw_tgt = 0;
+
+// Set the yaw target
+void yaw_set(int new_tgt) {
+	yaw_tgt = clamp(new_tgt + yaw_center, yaw_min_tgt, yaw_max_tgt);
+}
+
 // Cyclic yaw control function. Should be called periodically
 // from main()
 void yaw_update() {
-	// TODO: This
+	// Redirect to the position controller.
+	OnFwd(yaw_add_out, pos_cont(yaw_main_out, yaw_tgt));
 }
 
 #endif // YAW_NXC
